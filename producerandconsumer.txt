@@ -1,0 +1,75 @@
+#include <iostream>
+#include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h>
+
+using namespace std;
+
+const int BUFFER_SIZE = 5;
+int buffer[BUFFER_SIZE];
+sem_t mutex, empty, full;
+int in = 0, out = 0;
+
+void* producer(void* arg) {
+    int item;
+    for (int i = 0; i < 10; i++) {
+        item = rand() % 100; // Generate a random item
+
+        sem_wait(&empty);
+        sem_wait(&mutex);
+
+        // Produce item and add it to the buffer
+        buffer[in] = item;
+        cout << "Produced: " << item << endl;
+        in = (in + 1) % BUFFER_SIZE;
+
+        sem_post(&mutex);
+        sem_post(&full);
+
+        sleep(1); // Sleep for a while to simulate variable production time
+    }
+    pthread_exit(NULL);
+}
+
+void* consumer(void* arg) {
+    int item;
+    for (int i = 0; i < 10; i++) {
+        sem_wait(&full);
+        sem_wait(&mutex);
+
+        // Consume item from the buffer
+        item = buffer[out];
+        cout << "Consumed: " << item << endl;
+        out = (out + 1) % BUFFER_SIZE;
+
+        sem_post(&mutex);
+        sem_post(&empty);
+
+        sleep(2); // Sleep for a while to simulate variable consumption time
+    }
+    pthread_exit(NULL);
+}
+
+int main() {
+    pthread_t producerThread, consumerThread;
+
+    // Initialize semaphores
+    sem_init(&mutex, 0, 1);
+    sem_init(&empty, 0, BUFFER_SIZE);
+    sem_init(&full, 0, 0);
+
+    // Create producer and consumer threads
+    pthread_create(&producerThread, NULL, producer, NULL);
+    pthread_create(&consumerThread, NULL, consumer, NULL);
+
+    // Join threads
+    pthread_join(producerThread, NULL);
+    pthread_join(consumerThread, NULL);
+
+    // Destroy semaphores
+    sem_destroy(&mutex);
+    sem_destroy(&empty);
+    sem_destroy(&full);
+
+    return 0;
+}
